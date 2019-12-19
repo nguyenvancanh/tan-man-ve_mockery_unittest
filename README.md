@@ -238,4 +238,58 @@ public function test_repo()
 }
 ```
 
-V
+## 5. Mockery public static function and public statis variable
+
+```
+class Helper 
+{
+  public static $a;
+  
+  public static $b;
+  
+  public static function checkCondition()
+  {
+    //logic of funciton
+  }
+}
+
+class Controller
+{
+  public function index()
+  {
+    
+    // logic of function
+    Helper::checkCondition();
+  }
+}
+```
+
+Chúng ta đều biết, để test được hàm index, thì cần phải Mock được class helper và tùy ý trả về kết quả cho hàm checkCondition(). Nhưng mock được class helper với người chưa từng trải thì thật sự khó khăn, sau bao thời gian nghiên cứu, đúc kết lại cho các bạn cách sau
+
+đầu tiên, chúng ta cần khai báo thêm một class Stub như sau
+
+```
+class HelperStub
+{
+  public static $a;
+  
+  public static $b;
+}
+```
+
+Tiếp theo, gọi mock như sau
+
+```
+ /**
+ * @test
+ * @runInSeparateProcess
+ * @preserveGlobalState disabled
+ */
+public function test_index()
+{
+  $mock = Mockery::mock('alias:Helpers', HelperStub::class);
+  $mock->shouldRecieve('checkCondition)->andReturn();
+}
+```
+
+
