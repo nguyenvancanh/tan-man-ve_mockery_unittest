@@ -168,3 +168,74 @@ public function test_index()
 }
 
 ```
+
+## 4. Test repo with subquery
+
+```
+<? php
+
+class EloquentRepository extends Repository
+{
+  public function __construct(Model $model)
+  {
+      parent::__construct($model);
+  }
+  
+  public function findById($id, $postId)
+  {
+      return $this->model->where('id', $id)
+          ->whereHas('post', function ($query) use ($postId) {
+              return $query->where('id', $postId);
+          })
+          ->count();
+  }
+}
+```
+
+Thông thường, để test repository chúng ta làm như sau
+
+```
+public function test_repo()
+{
+  $model = Mockery::mock(Model::class);
+  $repo = new EloquentRepository($model);
+  $model->shouldReceive('where->whereHas->count')->andReturn(1);
+  $result = $repo->findById(1, 1);
+  // assert equals
+}
+```
+
+Với đoạn code trên, đảm bảo được hàm test của bạn chạy OK. Nhưng vấn đề là khi kiểm tra coverage thì coverage không chạy qua được dòng code 
+
+```
+->whereHas('post', function ($query) use ($postId) {
+      return $query->where('id', $postId);
+  })
+```
+
+Lúc này, coverage của function này sẽ không chạy được 100% line, đẫn đến coverage của method sẽ là 0%. vấn đề làn giải. xếp ép coverage > 80% mà giờ chạy được 0%. làm sao đây. Tham khảo cách dưới đây 
+
+```
+public function test_repo()
+{
+  $model = Mockery::mock(Model::class);
+  $repo = new EloquentRepository($model);
+  $model->shouldReceive('where')->andReturn($model);
+  $model->shouldReceive('whereHas')->once()
+  ->with('post', Mockery::on(function($whereHas) {
+      // Unit Test Closure
+      $mockDb = Mockery::mock('Illuminate\Database\DatabaseManager');
+      $subQuery = $mockDb->shouldReceive('where')
+          ->once()
+          ->andReturn($mockDb);
+      $whereHas->__invoke($mockDb);
+      return is_callable($whereHas);
+  }))
+  ->andReturn($model);
+  $model->shouldReceive('count')->andReturn(1);
+  $result = $repo->findById(1, 1);
+  // assert equals
+}
+```
+
+V
